@@ -7,7 +7,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 from sort_json import sort_cycles_in_floats
-API_KEY = "AIzaSyC3FYXWPut8ufr4fFJ9jllt44CeCy35prY"
+API_KEY = ""
 
 class State(TypedDict):
     user_query: str
