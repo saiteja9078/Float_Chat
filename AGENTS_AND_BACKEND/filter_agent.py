@@ -10,6 +10,8 @@ from langchain.schema import BaseMessage, HumanMessage, AIMessage
 from langgraph.graph import StateGraph, END
 from pydantic import BaseModel, Field
 import google.generativeai as genai
+from dotenv import load_dotenv
+load_dotenv()
 
 
 # Assume the DATA_STRUCTURE description is unchanged and available.
