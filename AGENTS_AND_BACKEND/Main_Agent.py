@@ -8,6 +8,7 @@ from langchain.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 from sort_json import sort_cycles_in_floats
 from dotenv import load_dotenv
+load_dotenv()
 class State(TypedDict):
     user_query: str
     dec_queries: List[str]
