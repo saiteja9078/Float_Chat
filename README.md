@@ -38,7 +38,7 @@ Google Gemini API Key
 # Download Argo dataset (example floats)
 # Data source: Argo Global Data Repository
 # ftp://ftp.ifremer.fr/ifremer/argo
-# Note: Full dataset is ~500GB, use sample data for testing
+# Note: Full dataset is huge,download some float's data and try this out
 ```
 
 ### 2. Usage
