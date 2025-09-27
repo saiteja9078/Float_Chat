@@ -53,21 +53,45 @@ open http://localhost:3000
 "Which float has the highest salinity readings?"
 ```
 
-## Project Structure
+# Database Setup (Postgres with Docker)
+
+To run a local PostgreSQL database for this project:
+
+```bash
+docker run -d \
+  --name pg-argo \
+  -e POSTGRES_USER=argo_user \
+  -e POSTGRES_PASSWORD=argo_pass \
+  -e POSTGRES_DB=argo_db \
+  -p 5432:5432 \
+  postgres:15
 ```
-├── AGENTS_AND_BACKEND/
-│   ├── filter_agent.py      # Geographic & parameter filtering
-│   ├── sql_agent.py         # Database query generation
-│   ├── main_orchestrator.py # Agent coordination
-│   ├── app.py              # Flask API server
-│   └── requirements.txt
-├── FRONTEND/
-│   ├── components/         # React components
-│   ├── pages/             # Next.js pages
-│   ├── utils/             # Utility functions
-│   └── package.json
-└── README.md
-```
+
+### Connection Details
+
+* **Host:** `localhost`
+* **Port:** `5432`
+* **Database:** `argo_db`
+* **User:** `argo_user`
+* **Password:** `argo_pass`
+
+### Useful Commands
+
+* Stop container:
+
+  ```bash
+  docker stop pg-argo
+  ```
+* Start container:
+
+  ```bash
+  docker start pg-argo
+  ```
+* Access Postgres shell:
+
+  ```bash
+  docker exec -it pg-argo psql -U argo_user -d argo_db
+  ```
 
 ## Key Features
 
