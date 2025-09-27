@@ -10,7 +10,7 @@ pip install -r requirements.txt
 ```
 
 ### 2. Environment Configuration
-Create a `.env` file in the project root and add your Google AI API key:
+Open the `.env` file in the project root and add your Google AI API key:
 
 ```env
 GOOGLE_API_KEY=your_google_api_key_here
