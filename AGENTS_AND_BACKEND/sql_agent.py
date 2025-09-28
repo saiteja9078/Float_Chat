@@ -3,8 +3,10 @@ import psycopg2
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import ChatPromptTemplate
 from dotenv import load_dotenv
+import os
 load_dotenv()
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash",api_key = "AIzaSyA8YxYWhMe_nC2N1IHR065TWN_yHiSptAM")
+API_KEY = os.getenv("GOOGLE_API_KEY")
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash",api_key = API_KEY)
 sql_prompt = ChatPromptTemplate.from_messages(
     [
         (
