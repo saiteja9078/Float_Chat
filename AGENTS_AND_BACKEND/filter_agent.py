@@ -14,7 +14,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-# Assume the DATA_STRUCTURE description is unchanged and available.
+
+
 DATA_STRUCTURE = """
 Float Data Structure:
 {
