@@ -21,7 +21,7 @@ model = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
 )
 
-
+API_KEY = os.getenv("GOOGLE_API_KEY")
 class Decomposed_Queries(BaseModel):
     for_filter_agent: str = Field(description="This variable is for Filter Agent.")
     for_sql_agent: str = Field(description="This is for SQL Agent.")
