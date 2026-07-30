@@ -1,122 +1,100 @@
-# Multi-Agent Argo Float Query System
+# Float Chat - ARGO Float 3D Oceanographic Data Visualization & AI Assistant
 
-An intelligent oceanographic data retrieval system that transforms natural language queries into complex Argo float data analysis through specialized AI agents.
+Float Chat is a comprehensive full-stack application that provides an interactive 3D globe visualization of oceanographic data (ARGO floats) combined with an intelligent AI chat interface. Users can query, explore, and visualize complex oceanographic information using natural language.
 
-## What It Does
-
-- **Natural Language Queries**: Ask questions like "Compare temperature of floats in Bay of Bengal and Arabian Sea"
-- **Geographic Intelligence**: Automatically recognizes ocean regions and applies coordinate boundaries
-- **Multi-Parameter Analysis**: Handles temperature, salinity, pressure, dissolved oxygen, and other oceanographic measurements
-- **Smart Data Processing**: Converts complex PostgreSQL array data into structured JSON for analysis
-- **Interactive Frontend**: Chat interface with real-time data visualization and 3D ocean mapping
+The project is divided into two main components:
+1. **Frontend**: A Next.js web application featuring an interactive 3D globe and a chat UI.
+2. **Backend (Agents & API)**: A Flask-based Python backend running a LangGraph-orchestrated multi-agent system powered by Gemini 2.5 Flash, which parses natural language into database filters and SQL queries.
 
 ## Architecture
 
-**Multi-Agent System:**
-- **Decomposition Agent**: Routes queries and determines processing needs
-- **Filter Agent**: Applies geographic and parameter filters with domain expertise
-- **SQL Agent**: Generates optimized database queries and processes oceanographic arrays
+- **Frontend (`/FRONTEND`)**: Built with Next.js, Tailwind CSS, and `react-globe.gl`. It communicates with the backend via the `/query-float` API endpoint.
+- **Backend & Agents (`/AGENTS_AND_BACKEND`)**: Built with Flask and LangGraph. It uses a graph-based agentic workflow:
+  - **Relevance Checker**: Classifies if the query is related to Argo floats and whether it needs dataset access.
+  - **Query Decomposer**: Breaks down the natural language query into instructions for the specialized sub-agents.
+  - **Filter Agent**: Identifies and filters relevant float IDs based on geographical, temporal, or parameter-specific criteria.
+  - **SQL Agent**: Generates and executes SQL queries to retrieve specific float data (temperature, salinity, depth, etc.) and formats the result as JSON.
 
-**Tech Stack:**
-- Backend: Python, LangGraph, Google Gemini, PostgreSQL, Flask
-- Frontend: React, Next.js, Three.js, Recharts
-- Data: Global Argo float network (6000+ active floats)
+## Features
+
+- **Interactive 3D Globe**: Built-in 3D visualization of the Earth with interactive ARGO floats, country borders, and geographic labels.
+- **AI Chat Interface**: Talk to the AI to query complex ARGO float datasets using natural language (e.g., "Show salinity profiles near the equator in 2023").
+- **Multi-Agent Workflow**: A LangGraph system dynamically breaks down queries, searches data, executes SQL, and retrieves relevant results.
+- **Real-time Updates**: The Flask backend streams the AI's "thinking" steps back to the frontend, providing visibility into the agent's decision-making process.
+
+## Prerequisites
+
+- **Node.js**: v18 or higher (for the frontend).
+- **Python**: v3.9 or higher (for the backend).
+- **API Keys**: Google Gemini API keys are required for the agent system.
 
 ## Setup Instructions
 
-### Prerequisites
-```bash
-# Required
-Python 3.8+
-Node.js 16+
-PostgreSQL 12+
-Google Gemini API Key
+### 1. Backend Setup (`/AGENTS_AND_BACKEND`)
+
+1. Navigate to the backend directory:
+   ```bash
+   cd AGENTS_AND_BACKEND
+   ```
+
+2. Create and activate a Python virtual environment (recommended):
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. Install the required Python dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Configure environment variables:
+   Copy `.env.example` to `.env` and fill in your API keys:
+   ```bash
+   cp .env.example .env
+   ```
+   *Ensure you provide the `MAIN_AGENT_API_KEY` and `FILTER_AGENT_API_KEY` variables.*
+
+5. Start the Flask API server:
+   ```bash
+   python api.py
+   ```
+   The backend will start running on `http://localhost:5001`.
+
+### 2. Frontend Setup (`/FRONTEND`)
+
+1. Navigate to the frontend directory:
+   ```bash
+   cd FRONTEND
+   ```
+
+2. Install the Node.js dependencies:
+   ```bash
+   npm install
+   # or yarn install / pnpm install
+   ```
+
+3. Start the Next.js development server:
+   ```bash
+   npm run dev
+   ```
+
+4. Open your browser and go to `http://localhost:3000`.
+
+## Project Structure
+
+```text
+Float_Chat/
+├── AGENTS_AND_BACKEND/      # Python backend and AI Agent logic
+│   ├── Main_Agent.py        # LangGraph workflow orchestrator
+│   ├── api.py               # Flask API server
+│   ├── filter_agent.py      # Sub-agent for filtering float data
+│   ├── sql_agent.py         # Sub-agent for generating and executing SQL queries
+│   ├── chat_memory.py       # Manages conversation history context
+│   └── requirements.txt     # Python dependencies
+└── FRONTEND/                # Next.js frontend application
+    ├── app/                 # Next.js app router and pages
+    ├── components/          # React components (Globe, Chat UI)
+    ├── package.json         # Node.js dependencies
+    └── README.md            # Frontend-specific documentation
 ```
-
-### 1. Data Setup
-```bash
-# Download Argo dataset (example floats)
-# Data source: Argo Global Data Repository
-# ftp://ftp.ifremer.fr/ifremer/argo
-# Note: Full dataset is huge,download some float's data and try this out
-```
-
-### 2. Usage
-```bash
-# Access the application
-open http://localhost:3000
-
-# Example queries to try:
-"Show me floats in the Arabian Sea"
-"Compare temperature between Bay of Bengal and Arabian Sea"
-"Find the deepest measurements in Indian Ocean"
-"Which float has the highest salinity readings?"
-```
-
-# Database Setup (Postgres with Docker)
-
-To run a local PostgreSQL database for this project:
-
-```bash
-docker run -d \
-  --name pg-argo \
-  -e POSTGRES_USER=argo_user \
-  -e POSTGRES_PASSWORD=argo_pass \
-  -e POSTGRES_DB=argo_db \
-  -p 5432:5432 \
-  postgres:15
-```
-
-### Connection Details
-
-* **Host:** `localhost`
-* **Port:** `5432`
-* **Database:** `argo_db`
-* **User:** `argo_user`
-* **Password:** `argo_pass`
-
-### Useful Commands
-
-* Stop container:
-
-  ```bash
-  docker stop pg-argo
-  ```
-* Start container:
-
-  ```bash
-  docker start pg-argo
-  ```
-* Access Postgres shell:
-
-  ```bash
-  docker exec -it pg-argo psql -U argo_user -d argo_db
-  ```
-
-## Key Features
-
-**Intelligent Query Processing:**
-- Automatic query classification (simple vs. data queries)
-- Multi-step query decomposition for complex requests
-- Geographic region recognition with coordinate mapping
-
-**Advanced Data Handling:**
-- PostgreSQL array processing for oceanographic profiles
-- Time-series data structuring and cycle sorting
-
-**Interactive Visualization:**
-- 3D globe with float positioning
-- Temperature/salinity/pressure profile plotting
-- Time-series analysis and comparison charts
-- Real-time data exploration interface
-  
-## Data Sources
-
-- **Argo Global Data Repository**: ftp://ftp.ifremer.fr/ifremer/argo
-- **Float Network**: 6000+ active autonomous profiling floats
-- **Coverage**: Global ocean measurements since 2000
-- **Parameters**: Temperature, salinity, pressure, dissolved oxygen, chlorophyll, pH
-
-## License
-
-MIT License - See LICENSE file for details

@@ -2,11 +2,8 @@ import json
 import psycopg2
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import ChatPromptTemplate
-from dotenv import load_dotenv
-import os
-load_dotenv()
-API_KEY = os.getenv("GOOGLE_API_KEY")
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash",api_key = API_KEY)
+
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash",api_key = "AIzaSyDs4p3zkmS0CQMUpBy_TAanFN0vMYDnJYA")
 sql_prompt = ChatPromptTemplate.from_messages(
     [
         (
@@ -81,6 +78,7 @@ conn = psycopg2.connect(
 )
 cur = conn.cursor()
 import math
+from collections import defaultdict
 
 def clean_value(val):
     if isinstance(val, float) and math.isnan(val):
@@ -88,6 +86,41 @@ def clean_value(val):
     if isinstance(val, list):
         return [clean_value(v) for v in val]
     return val
+
+BASE_KEYS = {"float_id", "cycle_number", "juld", "latitude", "longitude"}
+
+
+def extract_numeric_values(sequence):
+    numeric_values = []
+    if not isinstance(sequence, list):
+        return numeric_values
+
+    for item in sequence:
+        if isinstance(item, (int, float)) and not math.isnan(item):
+            numeric_values.append(float(item))
+    return numeric_values
+
+
+def build_float_summary(cycles_dict):
+    aggregates = defaultdict(list)
+    for cycle_payload in cycles_dict.values():
+        for key, value in cycle_payload.items():
+            if key in BASE_KEYS:
+                continue
+            numeric_values = extract_numeric_values(value)
+            if numeric_values:
+                aggregates[key].extend(numeric_values)
+
+    summary = {}
+    for key, values in aggregates.items():
+        if not values:
+            continue
+        summary[key] = {
+            "mean": sum(values) / len(values),
+            "samples": len(values)
+        }
+    return summary
+
 
 def format_json(rows, filter_out):
     grouped = {group: {} for group in filter_out.keys()}
@@ -104,15 +137,21 @@ def format_json(rows, filter_out):
 
         cycle = row["cycle_number"]
         if fid not in grouped[group]:
-            grouped[group][fid] = {}
-        grouped[group][fid][cycle] = {
+            grouped[group][fid] = {"cycles": {}}
+        grouped[group][fid]["cycles"][cycle] = {
             "juld": str(row["juld"]),
             "latitude": row["latitude"],
             "longitude": row["longitude"],
         }
         for col, val in row.items():
             if col not in {"float_id", "cycle_number", "juld", "latitude", "longitude"}:
-                grouped[group][fid][cycle][col] = clean_value(val)
+                grouped[group][fid]["cycles"][cycle][col] = clean_value(val)
+
+    # attach summaries so downstream agents/UI can surface aggregate context
+    for group, floats in grouped.items():
+        for fid, payload in floats.items():
+            cycles = payload.get("cycles", {})
+            payload["summary"] = build_float_summary(cycles) if cycles else {}
 
     return grouped
 

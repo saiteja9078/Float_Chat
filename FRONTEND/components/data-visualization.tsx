@@ -15,7 +15,20 @@ import {
   AreaChart,
   Area,
 } from "recharts"
-import { BarChart3, Download, Maximize2, Minimize2, MapPin, Calendar, TrendingUp } from "lucide-react"
+import { BarChart3, Download, Maximize2, Minimize2, MapPin, Calendar, TrendingUp, X } from 'lucide-react'
+import { useCoordinates } from "@/lib/coordinate-context"
+
+type SummaryStatsObject = {
+  mean?: number
+  average?: number
+  samples?: number
+  count?: number
+}
+
+type SummaryStats = SummaryStatsObject | number | null | undefined
+
+const isSummaryStatsObject = (value: SummaryStats): value is SummaryStatsObject =>
+  typeof value === "object" && value !== null
 
 interface DataVisualizationProps {
   data: any
@@ -30,32 +43,37 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
   const [plotType, setPlotType] = useState<"profile" | "timeseries">("profile")
   const [isExpanded, setIsExpanded] = useState(false)
   const [selectedRegion, setSelectedRegion] = useState<string>("")
+  const { addCoordinate, selectedCoordinates } = useCoordinates()
 
   const theme = {
-    bg: isDarkMode ? "bg-gray-900" : "bg-white",
-    cardBg: isDarkMode ? "bg-gray-800" : "bg-white",
-    border: isDarkMode ? "border-gray-700" : "border-gray-200",
-    text: isDarkMode ? "text-gray-100" : "text-gray-900",
-    textSecondary: isDarkMode ? "text-gray-400" : "text-gray-600",
-    buttonBg: isDarkMode ? "bg-gray-700" : "bg-gray-100",
-    buttonHover: isDarkMode ? "hover:bg-gray-600" : "hover:bg-gray-200",
-    selectBg: isDarkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300",
+    bg: "bg-background",
+    cardBg: "bg-card",
+    border: "border-border",
+    text: "text-foreground",
+    textSecondary: "text-muted-foreground",
+    buttonBg: "bg-secondary",
+    buttonHover: "hover:bg-muted",
+    selectBg: "bg-secondary border-border",
   }
 
   const structuredData = useMemo(() => {
     if (!data || typeof data !== "object") return null
 
     const regions = Object.keys(data)
-    const result: any = {}
+    const result: Record<string, any> = {}
 
     regions.forEach((region) => {
-      const floats = Object.keys(data[region])
+      const floats = Object.keys(data[region] || {})
       result[region] = {}
 
       floats.forEach((floatId) => {
-        const cycles = Object.keys(data[region][floatId])
-        result[region][floatId] = cycles.map((cycle) => {
-          const cycleData = data[region][floatId][cycle]
+        const floatEntry = data[region][floatId] || {}
+        const cyclesSource = floatEntry?.cycles ?? floatEntry
+        const summary = floatEntry?.summary ?? null
+
+        const cycleKeys = Object.keys(cyclesSource || {}).filter((key) => key !== "summary" && !key.startsWith("__"))
+        const processedCycles = cycleKeys.map((cycle) => {
+          const cycleData = cyclesSource?.[cycle] || {}
 
           const parameters = Object.keys(cycleData).filter(
             (key) => Array.isArray(cycleData[key]) && key !== "juld" && key !== "latitude" && key !== "longitude",
@@ -68,7 +86,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
                 ?.map((value: number, index: number) => {
                   const cleanValue = value !== null && !isNaN(value) ? value : null
                   return {
-                    depth: index * 10, // Assuming 10m intervals
+                    depth: index * 10,
                     [param]: cleanValue,
                   }
                 })
@@ -82,6 +100,11 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
             profileData,
           }
         })
+
+        result[region][floatId] = {
+          summary,
+          cycles: processedCycles,
+        }
       })
     })
 
@@ -94,7 +117,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
     const allParams = new Set<string>()
     Object.values(structuredData).forEach((region: any) => {
       Object.values(region).forEach((floatData: any) => {
-        floatData.forEach((cycle: any) => {
+        floatData?.cycles?.forEach((cycle: any) => {
           cycle.parameters?.forEach((param: string) => allParams.add(param))
         })
       })
@@ -103,12 +126,11 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
     return Array.from(allParams)
   }, [structuredData])
 
-  // Get available options for dropdowns
   const regions = structuredData ? Object.keys(structuredData) : []
   const floats = selectedRegion && structuredData ? Object.keys(structuredData[selectedRegion] || {}) : []
   const cycles =
     selectedFloat && selectedRegion && structuredData
-      ? structuredData[selectedRegion]?.[selectedFloat]?.map((c: any) => c.cycle.toString()) || []
+      ? structuredData[selectedRegion]?.[selectedFloat]?.cycles?.map((c: any) => c.cycle.toString()) || []
       : []
 
   React.useEffect(() => {
@@ -116,12 +138,16 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
       setSelectedRegion(regions[0])
     }
 
+    if (!structuredData) {
+      return
+    }
+
     if (selectedRegion && !selectedFloat) {
       const firstFloat = Object.keys(structuredData[selectedRegion] || {})[0]
       if (firstFloat) {
         setSelectedFloat(firstFloat)
-        if (structuredData[selectedRegion][firstFloat]?.length > 0) {
-          setSelectedCycle(structuredData[selectedRegion][firstFloat][0].cycle.toString())
+        if (structuredData[selectedRegion][firstFloat]?.cycles?.length > 0) {
+          setSelectedCycle(structuredData[selectedRegion][firstFloat].cycles[0].cycle.toString())
         }
       }
     }
@@ -134,7 +160,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
   const chartData = useMemo(() => {
     if (!structuredData || !selectedRegion || !selectedFloat || !selectedParameters.length) return []
 
-    const floatData = structuredData[selectedRegion]?.[selectedFloat]
+    const floatData = structuredData[selectedRegion]?.[selectedFloat]?.cycles
 
     if (plotType === "timeseries") {
       return (
@@ -148,7 +174,6 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
               longitude: cycleData.longitude,
             }
 
-            // Add average values for selected parameters
             selectedParameters.forEach((param) => {
               const values = cycleData[param]?.filter((v: number) => v !== null && !isNaN(v)) || []
               point[param] =
@@ -165,7 +190,6 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
       const cycleData = floatData?.find((c: any) => c.cycle.toString() === selectedCycle)
       if (!cycleData) return []
 
-      // Combine all selected parameters into single depth profile
       const maxLength = Math.max(...selectedParameters.map((param) => cycleData[param]?.length || 0))
 
       return Array.from({ length: maxLength }, (_, index) => {
@@ -179,22 +203,44 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
     }
   }, [structuredData, selectedRegion, selectedFloat, selectedCycle, selectedParameters, plotType])
 
-  // Get metadata for selected cycle
   const selectedCycleData = useMemo(() => {
     if (!structuredData || !selectedRegion || !selectedFloat || !selectedCycle) return null
 
-    return structuredData[selectedRegion]?.[selectedFloat]?.find((c: any) => c.cycle.toString() === selectedCycle)
+    return structuredData[selectedRegion]?.[selectedFloat]?.cycles?.find((c: any) => c.cycle.toString() === selectedCycle)
   }, [structuredData, selectedRegion, selectedFloat, selectedCycle])
 
-  if (!structuredData || regions.length === 0) {
-    return (
-      <div className={`p-4 ${theme.cardBg} border ${theme.border} rounded-lg`}>
-        <div className="flex items-center gap-2 text-orange-600">
-          <BarChart3 className="w-5 h-5" />
-          <span className="text-sm font-medium">No visualization data available</span>
-        </div>
-      </div>
-    )
+  const selectedFloatSummary = useMemo<Record<string, SummaryStats> | null>(() => {
+    if (!structuredData || !selectedRegion || !selectedFloat) return null
+    return (structuredData[selectedRegion]?.[selectedFloat]?.summary as Record<string, SummaryStats>) || null
+  }, [structuredData, selectedRegion, selectedFloat])
+
+  const summaryEntries = useMemo(() => {
+    if (!selectedFloatSummary) return []
+
+    const entries = Object.entries(selectedFloatSummary)
+    return entries
+      .map(([param, stats]) => {
+        if (stats === null || stats === undefined) return null
+        if (typeof stats === "number") {
+          return { param, mean: stats, samples: null }
+        }
+        if (isSummaryStatsObject(stats)) {
+          const mean =
+            typeof stats.mean === "number" ? stats.mean : typeof stats.average === "number" ? stats.average : null
+          const samples =
+            typeof stats.samples === "number" ? stats.samples : typeof stats.count === "number" ? stats.count : null
+          if (mean === null || mean === undefined) return null
+          return { param, mean, samples }
+        }
+        return null
+      })
+      .filter((entry): entry is { param: string; mean: number; samples: number | null } => entry !== null)
+      .sort((a, b) => a.param.localeCompare(b.param))
+  }, [selectedFloatSummary])
+
+  const handleCoordinateClick = (lat: number, lng: number) => {
+    addCoordinate(lat, lng, `Cycle ${selectedCycle || "Time Series"}`)
+    console.log("[v0] Coordinate added to globe:", { lat, lng })
   }
 
   const getParameterColor = (param: string, index: number) => {
@@ -215,8 +261,8 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
 
   const renderChart = () => {
     const colors = {
-      grid: isDarkMode ? "#374151" : "#E5E7EB",
-      text: isDarkMode ? "#D1D5DB" : "#374151",
+      grid: "#37393b",
+      text: "#a0a0a0",
     }
 
     const commonProps = {
@@ -263,8 +309,8 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: isDarkMode ? "#1F2937" : "#FFFFFF",
-                border: `1px solid ${isDarkMode ? "#374151" : "#E5E7EB"}`,
+                backgroundColor: "#2a2a2a",
+                border: `1px solid #37393b`,
                 borderRadius: "8px",
                 color: colors.text,
               }}
@@ -315,8 +361,8 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: isDarkMode ? "#1F2937" : "#FFFFFF",
-                border: `1px solid ${isDarkMode ? "#374151" : "#E5E7EB"}`,
+                backgroundColor: "#2a2a2a",
+                border: `1px solid #37393b`,
                 borderRadius: "8px",
                 color: colors.text,
               }}
@@ -370,8 +416,8 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: isDarkMode ? "#1F2937" : "#FFFFFF",
-                border: `1px solid ${isDarkMode ? "#374151" : "#E5E7EB"}`,
+                backgroundColor: "#2a2a2a",
+                border: `1px solid #37393b`,
                 borderRadius: "8px",
                 color: colors.text,
               }}
@@ -396,6 +442,31 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
     }
   }
 
+  const handleExportData = () => {
+    if (!chartData || chartData.length === 0) return
+
+    const csv = [
+      [
+        plotType === "timeseries" ? "Date" : "Depth (m)",
+        ...selectedParameters.map((p) => p.charAt(0).toUpperCase() + p.slice(1)),
+      ],
+      ...chartData.map((row: any) => [
+        plotType === "timeseries" ? row.dateStr : row.depth,
+        ...selectedParameters.map((p) => row[p] ?? ""),
+      ]),
+    ]
+      .map((row) => row.join(","))
+      .join("\n")
+
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `float-data-${selectedFloat}-cycle-${selectedCycle || "timeseries"}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div
       className={`${isExpanded ? "fixed inset-4 z-50" : "mt-3"} ${theme.cardBg} border ${theme.border} rounded-lg shadow-lg`}
@@ -409,10 +480,13 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
           </div>
           {selectedCycleData && plotType === "profile" && (
             <div className="flex items-center gap-4 text-sm">
-              <span className={`flex items-center gap-1 ${theme.textSecondary}`}>
+              <button
+                onClick={() => handleCoordinateClick(selectedCycleData.latitude, selectedCycleData.longitude)}
+                className={`flex items-center gap-1 ${theme.textSecondary} hover:text-blue-400 transition-colors cursor-pointer px-2 py-1 rounded hover:bg-white/10`}
+              >
                 <MapPin className="w-3 h-3" />
                 {selectedCycleData.latitude?.toFixed(2)}°N, {selectedCycleData.longitude?.toFixed(2)}°E
-              </span>
+              </button>
               <span className={`flex items-center gap-1 ${theme.textSecondary}`}>
                 <Calendar className="w-3 h-3" />
                 {new Date(selectedCycleData.juld).toLocaleDateString()}
@@ -430,6 +504,21 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
           </button>
         </div>
       </div>
+
+      {selectedCoordinates.length > 0 && (
+        <div className={`p-3 border-b ${theme.border} flex items-center gap-2 flex-wrap`}>
+          <span className={`text-sm font-medium ${theme.textSecondary}`}>
+            {selectedCoordinates.length} point(s) on globe:
+          </span>
+          {selectedCoordinates.map((coord, index) => (
+            <div key={index} className={`text-xs px-2 py-1 rounded bg-blue-600 text-white flex items-center gap-1`}>
+              <MapPin className="w-3 h-3" />
+              {coord.lat.toFixed(2)}°, {coord.lng.toFixed(2)}°
+              {coord.label && <span className="opacity-75">({coord.label})</span>}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Controls */}
       <div className={`p-4 border-b ${theme.border} space-y-4`}>
@@ -463,8 +552,8 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
               value={selectedRegion}
               onChange={(e) => {
                 setSelectedRegion(e.target.value)
-                setSelectedFloat("") // Reset float selection when region changes
-                setSelectedCycle("") // Reset cycle selection when region changes
+                setSelectedFloat("")
+                setSelectedCycle("")
               }}
               className={`px-3 py-1 text-sm border rounded-md ${theme.selectBg} ${theme.text}`}
             >
@@ -482,7 +571,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
               value={selectedFloat}
               onChange={(e) => {
                 setSelectedFloat(e.target.value)
-                setSelectedCycle("") // Reset cycle selection when float changes
+                setSelectedCycle("")
               }}
               className={`px-3 py-1 text-sm border rounded-md ${theme.selectBg} ${theme.text}`}
             >
@@ -502,7 +591,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
                 onChange={(e) => setSelectedCycle(e.target.value)}
                 className={`px-3 py-1 text-sm border rounded-md ${theme.selectBg} ${theme.text}`}
               >
-                {cycles.map((cycle) => (
+                {cycles.map((cycle: string) => (
                   <option key={cycle} value={cycle}>
                     Cycle {cycle}
                   </option>
@@ -554,6 +643,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
           </div>
 
           <button
+            onClick={handleExportData}
             className={`ml-auto px-3 py-1 text-sm ${theme.buttonBg} ${theme.buttonHover} rounded-md transition-colors flex items-center gap-1`}
           >
             <Download className="w-3 h-3" />
@@ -561,6 +651,28 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({ data, isDarkMode 
           </button>
         </div>
       </div>
+
+      {summaryEntries.length > 0 && (
+        <div className={`p-4 border-b ${theme.border}`}>
+          <div className="flex items-center justify-between mb-3">
+            <div className={`text-sm font-semibold ${theme.text}`}>Parameter Averages</div>
+            <div className={`text-xs ${theme.textSecondary}`}>
+              Across retrieved cycles for {selectedFloat || "selected float"}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {summaryEntries.map(({ param, mean, samples }) => (
+              <div key={param} className={`p-3 rounded-lg border ${theme.border} bg-muted`}>
+                <div className={`text-xs uppercase tracking-wide ${theme.textSecondary}`}>{param}</div>
+                <div className={`text-xl font-semibold ${theme.text}`}>{mean?.toFixed(2)}</div>
+                {samples !== null && (
+                  <div className={`text-xs ${theme.textSecondary}`}>{samples} measurements</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Chart */}
       <div className="p-4">

@@ -31,10 +31,13 @@ def sort_cycles_in_floats(data):
         print(f"  Found {float_count} float(s) in '{location}'")
         
         # Process each float ID (dynamically handles any float ID)
-        for float_idx, (float_id, cycles) in enumerate(floats.items(), 1):
+        for float_idx, (float_id, float_payload) in enumerate(floats.items(), 1):
             if float_idx % 100 == 0 or float_idx == float_count:
                 print(f"    Processing float {float_idx}/{float_count}: {float_id}")
             
+            cycles = float_payload.get("cycles", {})
+            summary = float_payload.get("summary", {})
+
             # Sort cycles by converting keys to integers for numerical sorting
             cycle_count = len(cycles)
             total_cycles += cycle_count
@@ -53,8 +56,12 @@ def sort_cycles_in_floats(data):
             sorted_cycles = OrderedDict()
             for cycle_num in sorted_cycle_numbers:
                 sorted_cycles[cycle_num] = cycles[cycle_num]
-            
-            sorted_data[location][float_id] = sorted_cycles
+
+            float_entry = {"cycles": sorted_cycles}
+            if summary:
+                float_entry["summary"] = summary
+
+            sorted_data[location][float_id] = float_entry
     
     return sorted_data
 
@@ -76,10 +83,13 @@ def sort_cycles_from_data(data):
         sorted_data[location] = {}
         
         # Process each float ID
-        for float_id, cycles in floats.items():
+        for float_id, float_payload in floats.items():
+            cycles = float_payload.get("cycles", {})
+            summary = float_payload.get("summary", {})
+
             # Sort cycles by converting keys to integers, then back to strings
             sorted_cycles = OrderedDict()
-            
+
             # Get cycle numbers as integers for proper numerical sorting
             cycle_numbers = list(cycles.keys())
             try:
@@ -94,6 +104,10 @@ def sort_cycles_from_data(data):
             for cycle_num in sorted_cycle_numbers:
                 sorted_cycles[cycle_num] = cycles[cycle_num]
             
-            sorted_data[location][float_id] = sorted_cycles
+            float_entry = {"cycles": sorted_cycles}
+            if summary:
+                float_entry["summary"] = summary
+
+            sorted_data[location][float_id] = float_entry
     
     return sorted_data

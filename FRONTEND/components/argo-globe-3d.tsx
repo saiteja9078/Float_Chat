@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from "react"
 import dynamic from "next/dynamic"
-import { useRouter } from "next/navigation"
-import { Maximize2, Minimize2, Download } from "lucide-react"
+import { useRouter } from 'next/navigation'
+import { Maximize2, Minimize2, Download, X } from 'lucide-react'
+import { useCoordinates } from "@/lib/coordinate-context"
 
 // Dynamically import react-globe.gl to avoid SSR issues
 const Globe = dynamic(() => import("react-globe.gl"), { ssr: false })
@@ -41,6 +42,7 @@ const ArgoGlobe3D = ({ isFullscreen = false, onToggleFullscreen }: ArgoGlobe3DPr
   const [countries, setCountries] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
+  const { selectedCoordinates, removeCoordinate, clearCoordinates } = useCoordinates()
 
   const argoFloats: ArgoFloat[] = [
     {
@@ -338,6 +340,17 @@ const ArgoGlobe3D = ({ isFullscreen = false, onToggleFullscreen }: ArgoGlobe3DPr
     window.URL.revokeObjectURL(jsonUrl)
   }
 
+  const customPoints = selectedCoordinates.map((coord) => ({
+    lat: coord.lat,
+    lng: coord.lng,
+    name: coord.label || "Selected Point",
+    status: "custom" as const,
+    depth: 0,
+    lastUpdate: new Date().toISOString(),
+  }))
+
+  const allPointsData = [...argoFloats, ...customPoints]
+
   if (isLoading) {
     return (
       <div className="h-full w-full bg-black flex items-center justify-center">
@@ -363,23 +376,37 @@ const ArgoGlobe3D = ({ isFullscreen = false, onToggleFullscreen }: ArgoGlobe3DPr
               <strong>${properties.NAME}</strong>
             </div>
           `}
-          pointsData={argoFloats}
+          pointsData={allPointsData}
           pointAltitude={0.02}
-          pointRadius={0.8}
-          pointColor={(d: any) => getFloatColor(d.status)}
+          pointRadius={(d: any) => (d.status === "custom" ? 1.2 : 0.8)}
+          pointColor={(d: any) => {
+            if (d.status === "custom") return "#60A5FA"
+            return getFloatColor(d.status)
+          }}
           onPointClick={handleFloatClick}
-          pointLabel={(d: any) => `
-            <div style="background: rgba(0,0,0,0.9); padding: 12px; border-radius: 6px; color: white; font-size: 12px; max-width: 250px;">
-              <strong>${d.name} (${d.id})</strong><br/>
-              <strong>Status:</strong> ${d.status.toUpperCase()}<br/>
-              <strong>Coordinates:</strong> ${d.lat.toFixed(2)}°S, ${d.lng.toFixed(2)}°E<br/>
-              <strong>Max Depth:</strong> ${d.depth}m<br/>
-              ${d.temperature ? `<strong>Sea Surface Temp:</strong> ${d.temperature}°C<br/>` : ""}
-              ${d.salinity ? `<strong>Salinity:</strong> ${d.salinity} PSU<br/>` : ""}
-              <strong>Last Profile:</strong> ${d.lastUpdate}<br/>
-              <em>Click to view detailed analysis</em>
-            </div>
-          `}
+          pointLabel={(d: any) => {
+            if (d.status === "custom") {
+              return `
+                <div style="background: rgba(0,0,0,0.9); padding: 12px; border-radius: 6px; color: white; font-size: 12px; max-width: 250px;">
+                  <strong>📌 ${d.name}</strong><br/>
+                  <strong>Coordinates:</strong> ${d.lat.toFixed(2)}°, ${d.lng.toFixed(2)}°<br/>
+                  <em style="color: #60A5FA;">Selected from data visualization</em>
+                </div>
+              `
+            }
+            return `
+              <div style="background: rgba(0,0,0,0.9); padding: 12px; border-radius: 6px; color: white; font-size: 12px; max-width: 250px;">
+                <strong>${d.name} (${d.id})</strong><br/>
+                <strong>Status:</strong> ${d.status.toUpperCase()}<br/>
+                <strong>Coordinates:</strong> ${d.lat.toFixed(2)}°S, ${d.lng.toFixed(2)}°E<br/>
+                <strong>Max Depth:</strong> ${d.depth}m<br/>
+                ${d.temperature ? `<strong>Sea Surface Temp:</strong> ${d.temperature}°C<br/>` : ""}
+                ${d.salinity ? `<strong>Salinity:</strong> ${d.salinity} PSU<br/>` : ""}
+                <strong>Last Profile:</strong> ${d.lastUpdate}<br/>
+                <em>Click to view detailed analysis</em>
+              </div>
+            `
+          }}
           labelsData={geographicLabels}
           labelLat={(d: any) => d.lat}
           labelLng={(d: any) => d.lng}
@@ -395,6 +422,37 @@ const ArgoGlobe3D = ({ isFullscreen = false, onToggleFullscreen }: ArgoGlobe3DPr
           height={dimensions.height}
         />
       </div>
+
+      {selectedCoordinates.length > 0 && (
+        <div className="absolute top-4 left-4 bg-black/80 backdrop-blur-sm px-4 py-3 rounded-lg border border-blue-400 max-w-xs">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-blue-200 font-medium text-sm">Selected Points ({selectedCoordinates.length})</div>
+            <button
+              onClick={clearCoordinates}
+              className="p-1 hover:bg-white/10 rounded transition-colors"
+              title="Clear all selected points"
+            >
+              <X className="w-4 h-4 text-blue-300" />
+            </button>
+          </div>
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            {selectedCoordinates.map((coord, index) => (
+              <div key={index} className="text-xs text-blue-100 flex items-center justify-between gap-2 bg-blue-900/30 p-1 rounded">
+                <span>
+                  {coord.lat.toFixed(2)}°, {coord.lng.toFixed(2)}°
+                </span>
+                <button
+                  onClick={() => removeCoordinate(index)}
+                  className="hover:bg-white/20 rounded p-0.5"
+                  title="Remove this point"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="absolute top-4 right-4 flex gap-2">
         <button

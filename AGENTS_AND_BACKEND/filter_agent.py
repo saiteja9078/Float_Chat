@@ -10,12 +10,9 @@ from langchain.schema import BaseMessage, HumanMessage, AIMessage
 from langgraph.graph import StateGraph, END
 from pydantic import BaseModel, Field
 import google.generativeai as genai
-from dotenv import load_dotenv
-load_dotenv()
 
 
-
-
+# Assume the DATA_STRUCTURE description is unchanged and available.
 DATA_STRUCTURE = """
 Float Data Structure:
 {
@@ -61,13 +58,15 @@ Float Data Structure:
 }
 """
 
+
+
 class AgentState(BaseModel):
     messages: List[BaseMessage] = []
     float_ids: List[str] = []
     query_processed: bool = False
 
 # Load data from file
-with open("meta_data.json","r") as f:
+with open("/Users/joyboy/Downloads/example/Float_Chat/AGENTS_AND_BACKEND/meta_data.json","r") as f:
     FLOAT_DATA = json.load(f)
 
 
@@ -387,7 +386,7 @@ class QueryDecomposition(BaseModel):
 class ArgoFloatAgent:
     def __init__(self, google_api_key: str):
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",
             google_api_key=google_api_key,
             temperature=0
         )
