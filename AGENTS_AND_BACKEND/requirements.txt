@@ -23,5 +23,3 @@ Flask-CORS==4.0.0
 # Environment management
 python-dotenv==1.0.1
 
-# Standard library (no installation needed)
-# os, re, json, math, datetime, typing, dataclasses

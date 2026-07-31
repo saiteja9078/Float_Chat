@@ -1,100 +1,150 @@
-# Float Chat - ARGO Float 3D Oceanographic Data Visualization & AI Assistant
+# Float Chat - 3D Oceanographic Data Visualization & AI Agent
 
-Float Chat is a comprehensive full-stack application that provides an interactive 3D globe visualization of oceanographic data (ARGO floats) combined with an intelligent AI chat interface. Users can query, explore, and visualize complex oceanographic information using natural language.
+Float Chat is an AI-powered conversational system and interactive visualization tool for oceanographic data collected by **ARGO Floats**. The project features a split-panel interface: a natural language chat assistant on the left, and a fully interactive 3D WebGL Globe showing float locations, trajectories, and parameters on the right.
 
-The project is divided into two main components:
-1. **Frontend**: A Next.js web application featuring an interactive 3D globe and a chat UI.
-2. **Backend (Agents & API)**: A Flask-based Python backend running a LangGraph-orchestrated multi-agent system powered by Gemini 2.5 Flash, which parses natural language into database filters and SQL queries.
+---
 
-## Architecture
+## 🏗️ Project Architecture
 
-- **Frontend (`/FRONTEND`)**: Built with Next.js, Tailwind CSS, and `react-globe.gl`. It communicates with the backend via the `/query-float` API endpoint.
-- **Backend & Agents (`/AGENTS_AND_BACKEND`)**: Built with Flask and LangGraph. It uses a graph-based agentic workflow:
-  - **Relevance Checker**: Classifies if the query is related to Argo floats and whether it needs dataset access.
-  - **Query Decomposer**: Breaks down the natural language query into instructions for the specialized sub-agents.
-  - **Filter Agent**: Identifies and filters relevant float IDs based on geographical, temporal, or parameter-specific criteria.
-  - **SQL Agent**: Generates and executes SQL queries to retrieve specific float data (temperature, salinity, depth, etc.) and formats the result as JSON.
+```mermaid
+graph TD
+    UI[Next.js React Frontend] <-->|HTTP/SSE Port 5001| API[Flask API Server]
+    API <-->|State/Context| MainAgent[Main Agent / LangGraph]
+    
+    MainAgent -->|Natural Language Filter Query| FilterAgent[Filter Agent]
+    FilterAgent -->|Structured Query translation| Mongo[(MongoDB)]
+    Mongo -->|Matching Float IDs| FilterAgent
+    FilterAgent -->|Float IDs| MainAgent
+    
+    MainAgent -->|Float IDs + Data Query| SQLAgent[SQL Agent]
+    SQLAgent -->|Translate to SQL| Postgres[(PostgreSQL)]
+    Postgres -->|Raw Profiles Data| SQLAgent
+    SQLAgent -->|Aggregated Data & Summaries| MainAgent
+    
+    MainAgent -->|Natural Language Explanation + Data Payload| API
+```
 
-## Features
+### 1. Frontend (`frontend/`)
+- Built using **Next.js** (App Router), **TypeScript**, and **Tailwind CSS**.
+- **3D Globe Visualization**: Employs `react-globe.gl` and `three.js` to render the globe, draw float positions, map historical trajectories, and color-code floats by status (Active, Recent, BGC equipped).
+- **Interactive Chat**: Allows sending free-form questions and streams the agent's thinking steps alongside responses.
 
-- **Interactive 3D Globe**: Built-in 3D visualization of the Earth with interactive ARGO floats, country borders, and geographic labels.
-- **AI Chat Interface**: Talk to the AI to query complex ARGO float datasets using natural language (e.g., "Show salinity profiles near the equator in 2023").
-- **Multi-Agent Workflow**: A LangGraph system dynamically breaks down queries, searches data, executes SQL, and retrieves relevant results.
-- **Real-time Updates**: The Flask backend streams the AI's "thinking" steps back to the frontend, providing visibility into the agent's decision-making process.
+### 2. Python Backend (`AGENTS_AND_BACKEND/`)
+Organized as a modular multi-agent workflow:
+- **API Entrypoint (`api/api.py`)**: Flask server serving `/query-float` endpoint. Streams agent reasoning and data results back to the client as newline-delimited JSON (NDJSON).
+- **Orchestration Agent (`agents/Main_Agent.py`)**: A LangGraph state machine that handles:
+  1. Relevance checks.
+  2. Query decomposition.
+  3. Orchestrating the retrieval loop (invoking the Filter and SQL agents).
+  4. Formulating the final response.
+- **Filter Agent (`agents/filter_agent_mongodb.py`)**: Formulates exact MongoDB queries from natural language queries to identify which Float IDs match metadata constraints (e.g., geographic coordinates, time range, sensor types, general boundaries).
+- **SQL Agent (`agents/sql_agent.py`)**: Translates natural language requests and the filtered Float IDs into precise SQL queries to extract detailed measurements (temperature, salinity, pressure, BGC indicators) from PostgreSQL.
+- **Databases**:
+  - **MongoDB** (`argo_database.argo_floats`): Stores high-level float metadata, status, launch coordinates, and sensor inventories.
+  - **PostgreSQL** (`argo_db.argo_profiles`): Stores deep multi-depth profile arrays for variables (temperature, salinity, pressure, dissolved oxygen, chlorophyll, backscattering) matching each cycle.
 
-## Prerequisites
+---
 
-- **Node.js**: v18 or higher (for the frontend).
-- **Python**: v3.9 or higher (for the backend).
-- **API Keys**: Google Gemini API keys are required for the agent system.
+## 📂 Codebase Reorganization
 
-## Setup Instructions
+The project structure has been refactored for modularity:
 
-### 1. Backend Setup (`/AGENTS_AND_BACKEND`)
+```text
+floatchat/
+├── .gitignore                      # Git exclusion rules (OS, Next.js, Python envs, logs, zip files)
+├── README.md                       # Overall project documentation (this file)
+├── frontend/                       # Frontend application (Next.js)
+│   ├── app/                        # Pages & global styling
+│   ├── components/                 # React and 3D globe visualization components
+│   ├── lib/                        # Client state context and utilities
+│   ├── pnpm-lock.yaml              # Lockfile for pnpm package manager
+│   ├── package.json                # Frontend package dependencies
+│   └── README.md                   # Frontend setup & usage instructions
+└── AGENTS_AND_BACKEND/             # Backend services & agent engine (Python)
+    ├── .env                        # Local secret keys (Google Gemini, DB connection settings)
+    ├── .env.example                # Configuration template
+    ├── requirements.txt            # Python dependencies (pymongo, psycopg2, langchain, etc.)
+    ├── api/
+    │   └── api.py                  # Flask REST API server (port 5001)
+    ├── agents/
+    │   ├── Main_Agent.py           # LangGraph master coordinator agent
+    │   ├── filter_agent_mongodb.py # MongoDB structured query generator
+    │   ├── filter_agent.py         # File-based filter agent fallback
+    │   ├── sql_agent.py            # PostgreSQL query generator
+    │   └── sort_json.py            # Numeric cycle sorting helpers
+    ├── db/
+    │   ├── mongodb.py              # MongoDB upsert and cleaning script
+    │   ├── sql_setup.py            # PostgreSQL database creation and NetCDF processing
+    │   └── chat_memory.py          # Session-based token-managed message cache
+    └── data/
+        ├── meta_data.json          # Raw float metadata payload
+        └── results.json            # Cached result sets
+```
 
+---
+
+## 💡 Design Decision: MongoDB Filtering vs. RAG
+
+A core design choice in this application is the use of **MongoDB structured query generation** for metadata filtering rather than **RAG (Retrieval-Augmented Generation)** with vector database search.
+
+### Why RAG was Rejected for Float Metadata
+1. **Fuzzy Semantics vs. Exact Numerical Ranges**: 
+   - Oceanographic queries are highly quantitative (e.g., *"Find floats in the Arabian Sea between 10°N-20°N latitude"* or *"Find floats with temperature > 25°C"*).
+   - RAG relies on vector similarity (cosine distance on embeddings), which measures semantic closeness in language. It has no mathematical understanding of numbers, ranges, inequalities, or logical coordinates.
+2. **Deterministic Filters**:
+   - Storing structured metadata as text chunks and vectorizing it results in non-deterministic results. Important floats might be missing from the top-k similarity results.
+   - Database operations (like sorting by maximum pressure, grouping, or matching array sensors) cannot be reliably executed using vector database retrieval.
+3. **Structured vs. Unstructured Data**:
+   - The metadata for ARGO floats is highly structured (serial numbers, dates, lists of nested sensors, coordinate limits). Storing this structure in a document database (MongoDB) is the correct paradigm.
+
+### How the MongoDB Filtering Agent Works
+Instead of search matching, the **Filter Agent** uses a structured LLM (`gemini-2.5-flash`) to parse natural language constraints and translate them directly into **MongoDB queries**:
+- It translates *"Arabian Sea"* into `{"launch_info.latitude": {"$gte": 8, "$lte": 25}, "launch_info.longitude": {"$gte": 50, "$lte": 75}}`.
+- It translates *"temperature greater than 25"* into `{"$or": [{"temp_max": {"$gt": 25}}, {"temp_min": {"$gt": 25}}, {"temp_avg": {"$gt": 25}}]}`.
+- It translates *"NOT in Indian Ocean"* into `{"location": {"$ne": "Indian Ocean"}}`.
+
+This ensures **100% precision, deterministic matching, and full database query expressiveness**.
+
+---
+
+## 🚀 Running the Application
+
+### 1. Run the Python Backend
 1. Navigate to the backend directory:
    ```bash
    cd AGENTS_AND_BACKEND
    ```
-
-2. Create and activate a Python virtual environment (recommended):
+2. Create and activate a virtual environment:
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   python3 -m venv .venv
+   source .venv/bin/activate
    ```
-
-3. Install the required Python dependencies:
+3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-
-4. Configure environment variables:
-   Copy `.env.example` to `.env` and fill in your API keys:
+4. Copy the environment template and set your API keys:
    ```bash
    cp .env.example .env
+   # Open .env and add your Gemini keys (e.g. MAIN_AGENT_API_KEY)
    ```
-   *Ensure you provide the `MAIN_AGENT_API_KEY` and `FILTER_AGENT_API_KEY` variables.*
-
-5. Start the Flask API server:
+5. Run the Flask server:
    ```bash
-   python api.py
+   python api/api.py
    ```
-   The backend will start running on `http://localhost:5001`.
+   The backend will start on `http://localhost:5001`.
 
-### 2. Frontend Setup (`/FRONTEND`)
-
-1. Navigate to the frontend directory:
+### 2. Run the Next.js Frontend
+1. Open a new terminal and navigate to the frontend directory:
    ```bash
-   cd FRONTEND
+   cd frontend
    ```
-
-2. Install the Node.js dependencies:
+2. Install the packages using `pnpm`:
    ```bash
-   npm install
-   # or yarn install / pnpm install
+   pnpm install
    ```
-
-3. Start the Next.js development server:
+3. Start the dev server:
    ```bash
-   npm run dev
+   pnpm dev
    ```
-
-4. Open your browser and go to `http://localhost:3000`.
-
-## Project Structure
-
-```text
-Float_Chat/
-├── AGENTS_AND_BACKEND/      # Python backend and AI Agent logic
-│   ├── Main_Agent.py        # LangGraph workflow orchestrator
-│   ├── api.py               # Flask API server
-│   ├── filter_agent.py      # Sub-agent for filtering float data
-│   ├── sql_agent.py         # Sub-agent for generating and executing SQL queries
-│   ├── chat_memory.py       # Manages conversation history context
-│   └── requirements.txt     # Python dependencies
-└── FRONTEND/                # Next.js frontend application
-    ├── app/                 # Next.js app router and pages
-    ├── components/          # React components (Globe, Chat UI)
-    ├── package.json         # Node.js dependencies
-    └── README.md            # Frontend-specific documentation
-```
+   The site will load on `http://localhost:3000`. Open it in your browser to start querying the floats!
