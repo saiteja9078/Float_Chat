@@ -6,23 +6,8 @@ Float Chat is an AI-powered conversational system and interactive visualization 
 
 ## 🏗️ Project Architecture
 
-```mermaid
-graph TD
-    UI[Next.js React Frontend] <-->|HTTP/SSE Port 5001| API[Flask API Server]
-    API <-->|State/Context| MainAgent[Main Agent / LangGraph]
-    
-    MainAgent -->|Natural Language Filter Query| FilterAgent[Filter Agent]
-    FilterAgent -->|Structured Query translation| Mongo[(MongoDB)]
-    Mongo -->|Matching Float IDs| FilterAgent
-    FilterAgent -->|Float IDs| MainAgent
-    
-    MainAgent -->|Float IDs + Data Query| SQLAgent[SQL Agent]
-    SQLAgent -->|Translate to SQL| Postgres[(PostgreSQL)]
-    Postgres -->|Raw Profiles Data| SQLAgent
-    SQLAgent -->|Aggregated Data & Summaries| MainAgent
-    
-    MainAgent -->|Natural Language Explanation + Data Payload| API
-```
+<img width="794" height="570" alt="Screenshot 2026-07-31 at 9 52 59 PM" src="https://github.com/user-attachments/assets/69786a74-7b1c-4815-8657-c763c593d589" />
+
 
 ### 1. Frontend (`frontend/`)
 - Built using **Next.js** (App Router), **TypeScript**, and **Tailwind CSS**.
