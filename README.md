@@ -1,4 +1,5 @@
-# Float Chat - 3D Oceanographic Data Visualization & AI Agent
+# Float Chat - 3D Oceanographic Data Visualization & Chat Agent
+[**Click**](https://www.linkedin.com/posts/sai-teja-00aa50289_agents-ai-agentai-ugcPost-7377784651966373889-INw3) for demo.
 
 Float Chat is an AI-powered conversational system and interactive visualization tool for oceanographic data collected by **ARGO Floats**. The project features a split-panel interface: a natural language chat assistant on the left, and a fully interactive 3D WebGL Globe showing float locations, trajectories, and parameters on the right.
 
