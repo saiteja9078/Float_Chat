@@ -181,7 +181,7 @@ def filter_by_date_range(start_date: str, end_date: str, k: Union[int, str] = "a
         except (ValueError, TypeError):
             return matching_floats
 
-# REFINED TOOL WITH MINOR BUG FIX
+
 @tool
 def filter_by_parameter_value(parameter: str, operator: str, value: float, k: Union[int, str] = "all") -> List[str]:
     """
@@ -329,8 +329,6 @@ def filter_by_negation(filter_type: str, k: Union[int, str] = "all", **kwargs) -
     inner_k = kwargs.pop('k', 'all')
     
     floats_to_exclude = []
-    # *** THIS IS THE CORRECTED LOGIC ***
-    # We check for the keyword 'in' the filter_type string to make it more robust.
     if 'coordinates' in filter_type:
         floats_to_exclude = filter_by_coordinates.func(k=inner_k, **kwargs)
     elif 'date_range' in filter_type:
